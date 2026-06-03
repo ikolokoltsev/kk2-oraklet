@@ -12,3 +12,6 @@ def set_dataset(df: pd.DataFrame) -> None:
 
 def get_dataset() -> pd.DataFrame | None:
     return _store
+
+def get_stats():
+    return _store.describe(include="all").fillna("").to_dict()

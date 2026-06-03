@@ -46,3 +46,11 @@ async def upload(file: Annotated[UploadFile, File(...)]) -> UploadResponse:
     logger.info("Uploaded: %s", file.filename)
     
     return UploadResponse(rows=len(df), columns=list(df.columns), dtypes={col: str(dtype) for col, dtype in df.dtypes.items()})
+
+@app.get("/data/stats", responses={404: {"Description": "No dataset uploaded"}})
+def stats() -> dict:
+    df = data.get_dataset()
+    if df is None:
+        raise HTTPException(status_code=404, detail="No dataset uploaded")
+    
+    return data.get_stats()

@@ -22,3 +22,15 @@ def test_upload_csv():
     assert data["rows"] == 2
     assert "columns" in data
     assert "dtypes" in data
+    
+def test_stats_no_dataset():
+    import app.data as d
+    d._store = None
+    response = client.get("/data/stats")
+    assert response.status_code == 404
+    
+def test_stats_after_upload():
+    client.post("/data/upload", files={"file": ("test.csv", io.BytesIO(content.encode()), "text/csv")})
+    response = client.get("/data/stats")
+    assert response.status_code == 200
+    assert "col1" in response.json()
