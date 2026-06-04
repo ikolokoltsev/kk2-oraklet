@@ -15,3 +15,7 @@ def get_dataset() -> pd.DataFrame | None:
 
 def get_stats():
     return _store.describe(include="all").fillna("").to_dict()
+
+def clear_dataset() -> None:
+    global _store
+    _store = None

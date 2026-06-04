@@ -2,11 +2,13 @@ import io
 import logging
 import pandas as pd
 from typing import Annotated
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import Body, FastAPI, HTTPException, UploadFile, File
 
 from app import data
-from app.schemas import UploadResponse
+from app.schemas import AskRequest, AskResponse, UploadResponse
 from app.config import settings
+from app.chain.pipeline import oraklet
+from app.chain.steps import PromptBuilderInput
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,10 +49,26 @@ async def upload(file: Annotated[UploadFile, File(...)]) -> UploadResponse:
     
     return UploadResponse(rows=len(df), columns=list(df.columns), dtypes={col: str(dtype) for col, dtype in df.dtypes.items()})
 
-@app.get("/data/stats", responses={404: {"Description": "No dataset uploaded"}})
+@app.get("/data/stats", responses={404: {"description": "No dataset uploaded"}})
 def stats() -> dict:
     df = data.get_dataset()
     if df is None:
         raise HTTPException(status_code=404, detail="No dataset uploaded")
     
     return data.get_stats()
+
+@app.post(
+    "/ai/ask",
+    responses={400: {"description": "No dataset uploaded yet"}, 500: {"description": "Model error"}},
+)
+def ask(request: Annotated[AskRequest, Body()]) -> AskResponse:
+    if data.get_dataset() is None:
+        raise HTTPException(status_code=400, detail="No dataset uploaded yet")
+
+    try:
+        return oraklet.invoke(
+            PromptBuilderInput(question=request.question, stats=data.get_stats())
+        )
+    except RuntimeError as e:
+        logger.exception("Chain error")
+        raise HTTPException(status_code=500, detail=str(e))
