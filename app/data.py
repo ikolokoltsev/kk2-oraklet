@@ -13,7 +13,7 @@ def set_dataset(df: pd.DataFrame) -> None:
 def get_dataset() -> pd.DataFrame | None:
     return _store
 
-def get_stats():
+def get_stats() -> dict[str, dict]:
     return _store.describe(include="all").fillna("").to_dict()
 
 def clear_dataset() -> None:

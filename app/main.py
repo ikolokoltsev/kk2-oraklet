@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 @app.get("/health")
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 @app.post("/data/upload", responses={400: {"description": "Invalid file"}, 413: {"description": "File is too big"}})

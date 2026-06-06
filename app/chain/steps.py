@@ -33,7 +33,8 @@ class PromptBuilder(Runnable[PromptBuilderInput, PromptBuilderOutput]):
                 "content": (
                     "You are a data analyst assistant. "
                     "Answer questions about the dataset concisely and accurately. "
-                    "Base your answers only on the statistics provided."
+                    "Base your answers only on the statistics provided. "
+                    "Response in the same language as the question."
                 ),
             },  
             {
