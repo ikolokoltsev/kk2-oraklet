@@ -48,7 +48,6 @@ def test_ask_no_dataset():
     response = client.post("/ai/ask", json={"question": "test"})
     assert response.status_code == 400
 
-
 def test_ask_with_mocked_llm():
     client.post("/data/upload", files={"file": ("test.csv", io.BytesIO(content.encode()), "text/csv")})
     fake = LLMRunnerOutput(raw_text="42", question="test")
@@ -57,3 +56,9 @@ def test_ask_with_mocked_llm():
     assert response.status_code == 200
     assert "answer" in response.json()
     assert "model" in response.json()
+
+def test_ask_model_failure_returns_500():
+    client.post("/data/upload", files={"file": ("test.csv", io.BytesIO(content.encode()), "text/csv")})
+    with patch("app.chain.steps.LLMRunner.invoke", side_effect=RuntimeError("Model timed out")):
+        response = client.post("/ai/ask", json={"question": "test"})
+    assert response.status_code == 500
