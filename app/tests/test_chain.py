@@ -1,7 +1,13 @@
+import time
+import pytest
+
+from unittest.mock import patch
+from app.config import settings
 from app.chain.steps import (
-    PromptBuilder, PromptBuilderInput,
+    LLMRunner, PromptBuilder, PromptBuilderInput, PromptBuilderOutput,
     ResponseParser, LLMRunnerOutput,
-)   
+)
+
 
 
 def test_prompt_builder_includes_question():
@@ -31,3 +37,19 @@ def test_response_parser_fallback_on_empty():
     step = ResponseParser()
     result = step.invoke(LLMRunnerOutput(raw_text="", question="What?"))
     assert len(result.answer) > 0
+    
+def test_llm_runner_times_out(monkeypatch):
+    def slow_pipe(*args, **kwarg):
+        time.sleep(1)
+        return [{"message": "should never be returned"}]
+    
+    monkeypatch.setattr(settings, "model_timeout_seconds", 0.1)
+    
+    with patch("app.chain.steps.pipeline", return_value=slow_pipe):
+        with pytest.raises(RuntimeError):
+            LLMRunner().invoke(
+                PromptBuilderOutput(
+                    messages=[{"role": "user", "content": "hi"}],
+                    question="q"
+                )
+            )

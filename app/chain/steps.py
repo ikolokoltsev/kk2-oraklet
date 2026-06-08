@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from app.chain.runnable import Runnable
 from app.config import settings
 from app.schemas import AskResponse
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +50,24 @@ class LLMRunner(Runnable[PromptBuilderOutput, LLMRunnerOutput]):
     name: str = "llm_runner"
     
     def invoke(self, data: PromptBuilderOutput) -> LLMRunnerOutput:
+        executor = ThreadPoolExecutor(max_workers=1)
         try:
             pipe = pipeline("text-generation", model=settings.model_name)
             logger.info("Calling model: %s", settings.model_name)
-            result = pipe(data.messages, max_new_tokens=200)
+            future = executor.submit(pipe, data.messages, max_new_tokens=200)
+            result = future.result(timeout=settings.model_timeout_seconds)
             raw_text = result[0]["generated_text"]
             if isinstance(raw_text, list):
                 raw_text = raw_text[-1].get("content", "")
             return LLMRunnerOutput(raw_text=str(raw_text), question=data.question)
+        except FuturesTimeout as e:
+            logger.error("Model timed out after %ss", settings.model_timeout_seconds)
+            raise RuntimeError("Model timed out") from e
         except Exception as e:
             logger.exception("Model error: %s", e)
             raise RuntimeError(f"Model failed: {e}") from e
+        finally:
+            executor.shutdown(wait=False)
 
 class ResponseParser(Runnable[LLMRunnerOutput, "AskResponse"]):
     name: str = "response_parser"
