@@ -37,6 +37,60 @@ http://localhost:8000/docs.
 > The first `/ai/ask` request downloads `HuggingFaceTB/SmolLM2-135M-Instruct` (~300 MB)
 > and runs it on CPU. Expect a few seconds per answer — this is normal for a local model.
 
+## Endpoints
+
+| Method | Path           | Description                                                   |
+| ------ | -------------- | ------------------------------------------------------------- |
+| GET    | `/health`      | Liveness check                                                |
+| POST   | `/data/upload` | Upload a CSV (form-data), store it in memory, return metadata |
+| GET    | `/data/stats`  | Pandas `describe()` of the stored dataset as JSON             |
+| POST   | `/ai/ask`      | Ask a question about the dataset; answered by the LLM chain   |
+
+## Example calls
+
+You can try everything interactively via Swagger at http://localhost:8000/docs, or with curl:
+
+```bash
+# Health
+curl http://localhost:8000/health
+# {"status": "ok"}
+
+# Upload a dataset
+curl -X POST http://localhost:8000/data/upload -F "file=@data.csv"
+# {"rows": 150, "columns": ["city", "temp_c", ...], "dtypes": {"city": "object", ...}}
+
+# Descriptive statistics
+curl http://localhost:8000/data/stats
+# Pandas describe() as JSON, keyed by column
+
+# Ask a question
+curl -X POST http://localhost:8000/ai/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which city has the highest average temperature?"}'
+# {
+#   "question": "Which city has the highest average temperature?",
+#   "answer": "...",
+#   "model": "HuggingFaceTB/SmolLM2-135M-Instruct"
+# }
+```
+
+## Error handling
+
+| Situation                                           | Status |
+| --------------------------------------------------- | ------ |
+| Invalid extension / unreadable / empty CSV          | 400    |
+| `/ai/ask` called before any dataset is uploaded     | 400    |
+| `/data/stats` called before any dataset is uploaded | 404    |
+| Upload larger than `MAX_FILE_SIZE_MB`               | 413    |
+| Model error or timeout                              | 500    |
+
+## Testing
+
+```bash
+uv run pytest app/tests/ -v # all tests
+uv run pytest app/tests/ -v -k chain # only the Runnable-step tests
+```
+
 ## Project structure
 
 ```
@@ -67,3 +121,14 @@ app/
 - **The model is treated as untrusted output.** `ResponseParser` extracts the relevant part
   of the raw generation rather than trusting it verbatim; answers may still be imperfect or
   hallucinated, as expected from a small model.
+
+## Future plans
+
+1. Update Rest API to SSR by using htmx to return a complete page.
+2. Since we will have a page as an answer we can build a selector to pick an LLM version
+   from the list, so we can pick the model depending on our needs.
+3. Add authorization and sessions for separate loaded files, in the same way we have separated
+   sessions in Claude, Chat GPT, etc.
+4. Implement service with data preparation and cleaning configuration. So we can prepare
+   data as we want for every csv we upload. Reason: we don't know the structure and dataset
+   specifics upfront, so we need to have at least easy tools to make data cleaner.
